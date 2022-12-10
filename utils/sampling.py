@@ -1,0 +1,110 @@
+import numba
+import numpy as np
+import torch
+import jittor
+import scipy.sparse as sp
+import random
+
+# from cogdl.utils.rwalk import random_walk as c_random_walk
+
+
+@numba.njit(cache=True, parallel=True)
+def random_walk(start, length, indptr, indices, p=0.0):
+    """
+    Parameters:
+        start : np.array(dtype=np.int32)
+        length : int
+        indptr : np.array(dtype=np.int32)
+        indices : np.array(dtype=np.int32)
+        p : float
+    Return:
+        list(np.array(dtype=np.int32))
+    """
+    result = [np.zeros(length, dtype=np.int32)] * len(start)
+    for i in numba.prange(len(start)):
+        result[i] = _random_walk(start[i], length, indptr, indices, p)
+    return result
+
+
+@numba.njit(cache=True)
+def _random_walk(node, length, indptr, indices, p=0.0):
+    result = [numba.int32(0)] * length
+    result[0] = numba.int32(node)
+    i = numba.int32(1)
+    _node = node
+    while i < length:
+        start = indptr[node]
+        end = indptr[node + 1]
+        sample = random.randint(start, end - 1)
+        node = indices[sample]
+        if np.random.uniform(0, 1) > p:
+            result[i] = node
+        else:
+            result[i] = _node
+        i += 1
+    return np.array(result, dtype=np.int32)
+
+
+class RandomWalker(object):
+    def __init__(self, adj=None, num_nodes=None):
+        if adj is None:
+            self.indptr = None
+            self.indices = None
+        else:
+            if isinstance(adj, jittor.Var):
+                if num_nodes is None:
+                    num_nodes = int(jittor.max(adj)) + 1
+                row, col = adj.numpy()
+                data = np.ones(row.shape[0])
+                adj = sp.csr_matrix((data, (row, col)), shape=(num_nodes, num_nodes))
+            adj = adj.tocsr()
+
+            self.indptr = adj.indptr
+            self.indices = adj.indices
+
+    def build_up(self, adj, num_nodes):
+        if self.indptr is not None:
+            return
+        if isinstance(adj, jittor.Var) or isinstance(adj, tuple):
+            row, col = adj
+            if num_nodes is None:
+                num_nodes = int(max(row.max(), col.max())) + 1
+            row, col = row.numpy(), col.numpy()
+            data = np.ones(row.shape[0])
+            adj = sp.csr_matrix((data, (row, col)), shape=(num_nodes, num_nodes))
+        adj = adj.tocsr()
+
+        self.indptr = adj.indptr
+        self.indices = adj.indices
+
+    def walk(self, start, walk_length, restart_p=0.0):
+        assert self.indptr is not None, "Please build the adj_list first"
+        if isinstance(start, jittor.Var):
+            start = start.numpy()
+        if isinstance(start, list):
+            start = np.asarray(start, dtype=np.int32)
+        result = random_walk(start, walk_length, self.indptr, self.indices, restart_p)
+        result = np.array(result, dtype=np.int64)
+        return result
+
+    def walk_one(self,start,length,p):
+        walk_res = [np.zeros(length, dtype=np.int32)] * len(start)
+        p=0.0
+        for i in range(len(start)):
+            node=start[i]
+            result = [np.int32(0)] * length
+            index = np.int32(0)
+            _node = node
+            while index < length:
+                start1 = self.indptr[node]
+                end1 = self.indptr[node + 1]
+                sample1 = random.randint(start1, end1 - 1)
+                node = self.indices[sample1]
+                if np.random.uniform(0, 1) > p:
+                    result[index] = node
+                else:
+                    result[index] = _node
+                index += 1
+            k = int(np.floor(np.random.rand() * len(result)))
+            walk_res[i] = result[k]
+        return walk_res
