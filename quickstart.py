@@ -12,5 +12,6 @@ experiment(dataset="cora", model="grand")
 
 
 #-----------------Attention Bug----------
+# experiment(dataset="cora", model="gat") #能运行，几个epoch后loss增加
 # experiment(dataset="cora", model="gat",nhead=1) #nhead=1报错
 # experiment(dataset="cora", model="drgat")   #loss会出现nan

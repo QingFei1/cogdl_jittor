@@ -1,9 +1,5 @@
-import os 
-os.environ['nvcc_path']="/usr/local/cuda-11.4/bin/nvcc"
 import numpy as np
 import jittor
-jittor.flags.use_cuda = 1
-jittor.flags.use_device = 2
 from jittor import nn
 from cogdl_jittor.layers import SELayer, GCNLayer ,GATLayer
 from cogdl_jittor.datasets import CoraDataset,CiteSeerDataset

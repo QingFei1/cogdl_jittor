@@ -158,7 +158,7 @@ class Adjacency(BaseGraph):
     def get_weight(self, indicator=None):
         """If `indicator` is not None, the normalization will not be implemented"""
         if self.weight is None or self.weight.shape[0] != self.col.shape[0]:
-            self.weight = jittor.ones(self.num_edges.item())
+            self.weight = jittor.ones(self.num_edges)
         weight = self.weight
         if indicator is not None:
             return weight
@@ -331,7 +331,7 @@ class Adjacency(BaseGraph):
         if self.row is not None:
             return self.row.shape[0]
         elif self.row_ptr is not None:
-            return self.row_ptr[-1]
+            return self.row_ptr[-1].item() #jittor.ones() need list
         else:
             return None
 
