@@ -1,6 +1,4 @@
 import os
-
-import torch
 import jittor
 from sklearn.preprocessing import StandardScaler
 

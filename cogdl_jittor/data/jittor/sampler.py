@@ -12,7 +12,7 @@ class NeighborSamplerDataset(jittor.dataset.Dataset):
     def __init__(self, dataset, sizes: List[int],batch_size=8, mask=None,**kwargs):
         super(NeighborSamplerDataset, self).__init__()
         self.graph_batch_size = batch_size
-        # shuffle = kwargs["shuffle"]
+        shuffle = kwargs["shuffle"]
         self.data = dataset.data
         self.x = self.data.x
         self.y = self.data.y
@@ -23,16 +23,13 @@ class NeighborSamplerDataset(jittor.dataset.Dataset):
         self.num_nodes = self.node_idx.shape[0]
         total_len=(self.num_nodes - 1) // self.graph_batch_size + 1
         self.set_attrs(total_len=total_len,batch_size=1,**kwargs)
-        # if shuffle: #打乱dataset，构建graph
-        #     idx = jittor.randperm(self.num_nodes)
-        #     self.node_idx = self.node_idx[idx]
-        
-    def dd(self):
-        idx = jittor.randperm(self.num_nodes)
-        self.node_idx = self.node_idx[idx]   
-    def shuffle(self):
-        idx = jittor.randperm(self.num_nodes)
-        self.node_idx = self.node_idx[idx]
+        if shuffle: 
+            idx = jittor.randperm(self.num_nodes)
+            self.node_idx = self.node_idx[idx]
+         
+    # def shuffle(self):
+    #     idx = jittor.randperm(self.num_nodes)
+    #     self.node_idx = self.node_idx[idx]
 
     
     def __getitem__(self, idx):
@@ -94,13 +91,13 @@ class UnsupNeighborSamplerDataset(jittor.dataset.Dataset):
         self.random_walker = RandomWalker()
         total_len=(self.num_nodes - 1) // self.graph_batch_size + 1
         self.set_attrs(total_len=total_len,batch_size=1,**kwargs)
-        if shuffle: #打乱dataset，构建graph
+        if shuffle: 
             idx = jittor.randperm(self.num_nodes)
             self.node_idx = self.node_idx[idx]
     
-    def shuffle(self):
-        idx = jittor.randperm(self.num_nodes)
-        self.node_idx = self.node_idx[idx]
+    # def shuffle(self):
+    #     idx = jittor.randperm(self.num_nodes)
+    #     self.node_idx = self.node_idx[idx]
 
     def __getitem__(self, idx):
         """
@@ -149,7 +146,7 @@ class UnsupNeighborSamplerDataset(jittor.dataset.Dataset):
         return data[0]
 
 
-# TODO 以下还未改 
+# TODO 
 
 # class ClusteredDataset(torch.utils.data.Dataset):
 #     partition_tool = None

@@ -5,9 +5,15 @@ import os
 import inspect
 from collections import defaultdict, namedtuple
 import warnings
-
-import jittor
-import jittor.nn as nn
+from cogdl_jittor.backend import BACKEND
+if BACKEND == 'jittor':
+    import jittor
+    from jittor import Module
+elif BACKEND == 'torch':
+    import torch
+    from torch.nn import Module
+else:
+    raise ("Unsupported backend:", BACKEND)
 import optuna
 from tabulate import tabulate
 
@@ -160,11 +166,11 @@ def train(args):  # noqa: C901
     else:
         args.num_classes = dataset.num_classes
     if hasattr(dataset.data, "edge_attr") and dataset.data.edge_attr is not None:
-        args.num_entities = len(jittor.unique(jittor.stack(dataset.data.edge_index)))
-        args.num_rels = len(jittor.unique(dataset.data.edge_attr))
+        args.num_entities = len(BACKEND.unique(BACKEND.stack(dataset.data.edge_index)))
+        args.num_rels = len(BACKEND.unique(dataset.data.edge_attr))
 
     # setup model
-    if isinstance(args.model, nn.Module):
+    if isinstance(args.model, Module):
         model = args.model
     else:
         model = build_model(args)
@@ -308,7 +314,7 @@ def experiment(dataset, model=None, **kwargs):
         model = "autognn"
     if isinstance(dataset, str) or isinstance(dataset, Dataset):
         dataset = [dataset]
-    if isinstance(model, str) or isinstance(model, nn.Module):
+    if isinstance(model, str) or isinstance(model, Module):
         model = [model]
     if "args" not in kwargs:
         args = get_default_args(dataset=[str(x) for x in dataset], model=[str(x) for x in model], **kwargs)
@@ -317,7 +323,7 @@ def experiment(dataset, model=None, **kwargs):
         for key, value in kwargs.items():
             if key != "args":
                 args.__setattr__(key, value)
-    if isinstance(model[0], nn.Module):
+    if isinstance(model[0], Module):
         args.model = [x.model_name for x in model]
     print(args)
     args.dataset = dataset

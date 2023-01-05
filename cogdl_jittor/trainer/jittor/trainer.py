@@ -228,29 +228,7 @@ class Trainer(object):
         print(final_test)
         return final_test
 
-    # def dist_train(self, model_w: ModelWrapper, dataset_w: DataWrapper):
-    #     mp.set_start_method("spawn", force=True)
-
-    #     device_count = torch.cuda.device_count()
-    #     if device_count < self.world_size:
-    #         size = device_count
-    #         print(f"Available device count ({device_count}) is less than world size ({self.world_size})")
-    #     else:
-    #         size = self.world_size
-
-    #     print(f"Let's using {size} GPUs.")
-
-    #     processes = []
-    #     for rank in range(size):
-    #         p = mp.Process(target=self.train, args=(rank, model_w, dataset_w))
-
-    #         p.start()
-    #         print(f"Process [{rank}] starts!")
-    #         processes.append(p)
-
-    #     for p in processes:
-    #         p.join()
-
+   
     def build_optimizer(self, model_w):
         opt_wrap = model_w.setup_optimizer()
         if isinstance(opt_wrap, list) or isinstance(opt_wrap, tuple):
@@ -319,7 +297,6 @@ class Trainer(object):
                 train_loader = dataset_w.on_train_wrapper()
                 train_dataset = train_loader.get_dataset_from_loader()
                 # if hasattr(train_dataset, "shuffle"):
-                #     train_dataset.dd()
                 #     train_dataset.shuffle()
                 training_loss = self.train_step(model_w, train_loader, optimizers, lr_schedulers)
 
