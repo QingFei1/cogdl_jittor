@@ -16,7 +16,7 @@ from cogdl_jittor.utils import (
     get_degrees,
 )
 from cogdl_jittor.utils.jittor import RandomWalker
-from cogdl.operators.sample import sample_adj_c, subgraph_c
+from cogdl_jittor.operators.sample import sample_adj_c, subgraph_c
 
 subgraph_c = None  # noqa: F811
 
@@ -792,20 +792,20 @@ class Graph(BaseGraph):
         if sample_adj_c is not None:
             if not isinstance(batch,jittor.Var):
                 batch = jittor.array(batch).long()
-            # (row_ptr, col_indices, nodes, edges) = sample_adj_c(
-            #     self._adj.row_indptr, self.col_indices, batch, size, replace
-            # )
-            #先转为torch test，之后再改
-            row_indptr=torch.LongTensor(self._adj.row_indptr.numpy())
-            col_indices=torch.LongTensor(self.col_indices.numpy())
-            batch=torch.LongTensor(batch.numpy())
             (row_ptr, col_indices, nodes, edges) = sample_adj_c(
-                row_indptr, col_indices, batch, size, replace
+                self._adj.row_indptr, self.col_indices, batch, size, replace
             )
-            row_ptr=jittor.array(row_ptr.numpy())
-            col_indices=jittor.array(col_indices.numpy())
-            nodes=jittor.array(nodes.numpy())
-            edges=jittor.array(edges.numpy())
+            #先转为torch test，之后再改
+            # row_indptr=torch.LongTensor(self._adj.row_indptr.numpy())
+            # col_indices=torch.LongTensor(self.col_indices.numpy())
+            # batch=torch.LongTensor(batch.numpy())
+            # (row_ptr, col_indices, nodes, edges) = sample_adj_c(
+            #     row_indptr, col_indices, batch, size, replace
+            # )
+            # row_ptr=jittor.array(row_ptr.numpy())
+            # col_indices=jittor.array(col_indices.numpy())
+            # nodes=jittor.array(nodes.numpy())
+            # edges=jittor.array(edges.numpy())
             #先转为torch test，之后再改
         else:
             if isinstance(batch,jittor.Var):

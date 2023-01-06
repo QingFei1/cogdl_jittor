@@ -5,7 +5,7 @@ import numpy as np
 import scipy.sparse as sp
 import torch
 import jittor
-from cogdl.operators.sample import coo2csr_cpu, coo2csr_cpu_index #sample暂时不可用
+from cogdl_jittor.operators.sample import coo2csr_cpu, coo2csr_cpu_index 
 
 
 def get_degrees(row, col, num_nodes=None):
@@ -97,7 +97,8 @@ def _coo2csr(edge_index, data, num_nodes=None, ordered=False, return_index=False
 
     row = edge_index[0]
     indptr = jittor.zeros(num_nodes + 1, dtype=jittor.int32)
-    elements, counts = jittor.unique(row, return_counts=True)
+    # elements, counts = jittor.unique(row, return_counts=True)
+    elements, inverse, counts = jittor.unique(row,return_inverse=True,return_counts=True)
     elements = elements.long() + 1
     indptr[elements] = counts.astype(indptr.dtype)
     indptr = indptr.cumsum(dim=0)
@@ -131,14 +132,7 @@ def coo2csr_index(row, col, num_nodes=None):
         return _coo2csr(jittor.stack([row, col]), None, num_nodes=num_nodes, return_index=True)
     row = row.long()
     col = col.long()
-    # indptr, reindex = coo2csr_cpu_index(row, col, num_nodes)
-    print("-------graph_utils_135用的是torch的sample的coo2csr--------")
-    row=torch.from_numpy(row.numpy()).long()
-    col=torch.from_numpy(col.numpy()).long()
-    num_nodes=torch.tensor(num_nodes).long()
-    indptr, reindex = coo2csr_cpu_index(row, col, num_nodes)  #这里用的是torch的sample
-    indptr=jittor.array(indptr.numpy())
-    reindex=jittor.array(reindex.numpy())
+    indptr, reindex = coo2csr_cpu_index(row, col, num_nodes)
     return indptr, reindex
 
 

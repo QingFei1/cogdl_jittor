@@ -6,7 +6,6 @@ path = os.path.join(os.path.dirname(__file__))
 
 try:
     compile_torch_extensions("sampler", os.path.join(path,"sample/sample.cpp"), [], [], [],1, 1)
-    #sample = load(name="sampler", sources=[os.path.join(path, "sample/sample.cpp")], verbose=False)
     import sampler as sample
     subgraph_c = sample.subgraph
     sample_adj_c = sample.sample_adj
