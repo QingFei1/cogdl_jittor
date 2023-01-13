@@ -5,12 +5,6 @@ import numpy as np
 from tqdm import tqdm
 import os
 
-import torch
-import torch.distributed as dist
-import torch.multiprocessing as mp
-from torch.nn.parallel import DistributedDataParallel
-from torch.cuda.amp import GradScaler, autocast
-
 from cogdl_jittor.backend import BACKEND
 import jittor
 from cogdl_jittor.wrappers.jittor.data_wrapper.base_data_wrapper import DataWrapper
@@ -269,7 +263,7 @@ class Trainer(object):
         patience = 0
         best_epoch = 0
         for stage in range(self.nstage):
-            with torch.no_grad():
+            with jittor.no_grad():
                 pre_stage_out = model_w.pre_stage(stage, dataset_w)
                 dataset_w.pre_stage(stage, pre_stage_out)
                 self.data_controller.training_proc_per_stage(dataset_w)
@@ -347,7 +341,7 @@ class Trainer(object):
                 for hook in self.after_epoch_hooks:
                     hook(self)
 
-            with torch.no_grad():
+            with jittor.no_grad():
                 model_w.eval()
                 post_stage_out = model_w.post_stage(stage, dataset_w)
                 dataset_w.post_stage(stage, post_stage_out)

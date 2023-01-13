@@ -7,7 +7,6 @@ from jittor.contrib import slice_var_index
 from tqdm import tqdm
 
 from cogdl_jittor.layers import GCNLayer
-from cogdl_jittor.datasets import CoraDataset
 
 class GCN(BaseModel):
     @staticmethod

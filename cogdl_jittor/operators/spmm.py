@@ -23,13 +23,11 @@ except Exception:
     csrspmm = None
 
 
-# try:
-#     spmm_cpu = load(
-#         name="spmm_cpu", extra_cflags=["-fopenmp"], sources=[os.path.join(path, "spmm/spmm_cpu.cpp")], verbose=False,
-#     )
-#     spmm_cpu = spmm_cpu.csr_spmm_cpu
-# except Exception:
-#     spmm_cpu = None
+try:
+    spmm_cpu = compile_torch_extensions("spmm_cpu", [os.path.join(path, "spmm/spmm_cpu.cpp")], [], [], [],1, 1)
+    spmm_cpu = spmm_cpu.csr_spmm_cpu
+except Exception:
+    spmm_cpu = None
 
 
 class SPMMFunction(Function):

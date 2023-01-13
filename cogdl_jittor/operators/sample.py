@@ -1,5 +1,4 @@
 import os
-from torch.utils.cpp_extension import load
 from jittor.compiler import compile_torch_extensions
 
 path = os.path.join(os.path.dirname(__file__))

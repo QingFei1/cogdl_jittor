@@ -7,7 +7,7 @@ jittor.flags.use_cuda=1
 from jittor import nn
 
 # import jittor.functional as F
-from cogdl_jittor.datasets import CoraDataset
+from cogdl_jittor.datasets.planetoid_data import CoraDataset
 from cogdl_jittor.data import Graph
 from cogdl_jittor.layers import SAGELayer
 from cogdl_jittor.models import BaseModel

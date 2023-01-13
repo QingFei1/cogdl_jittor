@@ -1,8 +1,16 @@
 from typing import Union, Callable
 import numpy as np
 import warnings
-import jittor
-import jittor.nn as nn
+from cogdl_jittor import function as BF
+from cogdl_jittor.backend import BACKEND
+if BACKEND == 'jittor':
+    from jittor import nn
+    from jittor import nn as F
+elif BACKEND == 'torch':
+    import torch.nn as nn
+    import torch.nn.functional as F
+else:
+    raise ("Unsupported backend:", BACKEND)
 
 from sklearn.metrics import f1_score
 
@@ -30,8 +38,8 @@ class BaseEvaluator(object):
 
     def __call__(self, y_pred, y_true):
         metric = self.eval_func(y_pred, y_true)
-        self.y_pred.append(y_pred)
-        self.y_true.append(y_true)
+        self.y_pred.append(BF.cpu(y_pred))
+        self.y_true.append(BF.cpu(y_true))
         return metric
 
     def clear(self):
@@ -40,8 +48,8 @@ class BaseEvaluator(object):
 
     def evaluate(self):
         if len(self.y_pred) > 0:
-            y_pred = jittor.concat(self.y_pred, dim=0)
-            y_true = jittor.concat(self.y_true, dim=0)
+            y_pred = BF.cat(self.y_pred, dim=0)
+            y_true = BF.cat(self.y_true, dim=0)
             self.clear()
             return self.eval_func(y_pred, y_true)
         return 0
@@ -55,10 +63,10 @@ class Accuracy(object):
         self.total = list()
 
     def __call__(self, y_pred, y_true):
-        pred = (y_pred.argmax(1)[0] == y_true).int()
+        pred = (BF.argmax(y_pred, 1) == y_true).int()
         tp = pred.sum().int()
         total = pred.shape[0]
-        if isinstance(tp,jittor.Var):
+        if BF.is_tensor(tp):
             tp = tp.item()
 
         # if self.mini_batch:
@@ -93,9 +101,9 @@ class MultiLabelMicroF1(Accuracy):
             border = 0
         y_pred[y_pred >= border] = 1
         y_pred[y_pred < border] = 0
-        tp = (y_pred * y_true).sum().float.item()
-        fp = ((1 - y_true) * y_pred).sum().float32().item()
-        fn = (y_true * (1 - y_pred)).sum().float32().item()
+        tp = BF.to((y_pred * y_true).sum(), BF.dtype_dict('float32')).item()
+        fp = BF.to(((1 - y_true) * y_pred).sum(), BF.dtype_dict('float32')).item()
+        fn = BF.to((y_true * (1 - y_pred)).sum(), BF.dtype_dict('float32')).item()
         total = tp + fp + fn
 
         # if self.mini_batch:
@@ -115,16 +123,16 @@ class MultiClassMicroF1(Accuracy):
 class CrossEntropyLoss(nn.Module):
     def __call__(self, y_pred, y_true):
         y_true = y_true.long()
-        y_pred = jittor.nn.log_softmax(y_pred, dim=-1)
-        return jittor.nn.nll_loss(y_pred, y_true)
+        y_pred = F.log_softmax(y_pred, dim=-1)
+        return F.nll_loss(y_pred, y_true)
 
 
 class BCEWithLogitsLoss(nn.Module):
     def __call__(self, y_pred, y_true, reduction="mean"):
         y_true = y_true.float()
-        loss = jittor.nn.BCEWithLogitsLoss(reduction=reduction)(y_pred, y_true)
+        loss = nn.BCEWithLogitsLoss(reduction=reduction)(y_pred, y_true)
         if reduction == "none":
-            loss = jittor.sum(jittor.mean(loss, dim=0))
+            loss = BF.sum(BF.mean(loss, dim=0))
         return loss
 
 
@@ -135,10 +143,10 @@ def multilabel_f1(y_pred, y_true, sigmoid=False):
     else:
         y_pred[y_pred > 0] = 1
         y_pred[y_pred <= 0] = 0
-    tp = (y_true * y_pred).sum().float32()
+    tp = BF.to((y_true * y_pred).sum(), BF.dtype_dict('float32'))
     # tn = ((1 - y_true) * (1 - y_pred)).sum().to(torch.float32)
-    fp = ((1 - y_true) * y_pred).sum().float32()
-    fn = (y_true * (1 - y_pred)).sum().float32()
+    fp = BF.to(((1 - y_true) * y_pred).sum(), BF.dtype_dict('float32'))
+    fn = BF.to((y_true * (1 - y_pred)).sum(), BF.dtype_dict('float32'))
 
     epsilon = 1e-7
     precision = tp / (tp + fp + epsilon)
@@ -149,33 +157,30 @@ def multilabel_f1(y_pred, y_true, sigmoid=False):
 
 def multiclass_f1(y_pred, y_true):
     y_true = y_true.squeeze().long()
-    preds = y_pred.argmax(1)[0]
-    preds = preds.numpy()
-    labels = y_true.numpy()
+    preds = BF.argmax(y_pred.max(1)[1])
+    preds = BF.cpu(preds).detach().numpy()
+    labels = BF.cpu(y_true).detach().numpy()
     micro = f1_score(labels, preds, average="micro")
     return micro
 
 
 def accuracy(y_pred, y_true):
-    if y_true.shape[-1]==1:
-        y_true = y_true.squeeze(-1).long()
-    else:
-        y_true = y_true.long()
-    preds = y_pred.argmax(1)[0].type_as(y_true)
-    correct = preds.equal(y_true).double()
+    y_true = BF.squeeze(y_true).long()
+    preds = BF.type_as(y_pred.max(1)[1], y_true)
+    correct = BF.eq(preds, y_true).double()
     correct = correct.sum().item()
     return correct / len(y_true)
 
 
 def cross_entropy_loss(y_pred, y_true):
     y_true = y_true.long()
-    y_pred = jittor.nn.log_softmax(y_pred, dim=-1)
-    return jittor.nn.nll_loss(y_pred, y_true)
+    y_pred = F.log_softmax(y_pred, dim=-1)
+    return F.nll_loss(y_pred, y_true)
 
 
 def bce_with_logits_loss(y_pred, y_true, reduction="mean"):
     y_true = y_true.float()
-    loss = jittor.nn.BCEWithLogitsLoss(reduction=reduction)(y_pred, y_true)
+    loss = nn.BCEWithLogitsLoss(reduction=reduction)(y_pred, y_true)
     if reduction == "none":
-        loss = jittor.sum(jittor.mean(loss, dim=0))
+        loss = BF.sum(BF.mean(loss, dim=0))
     return loss

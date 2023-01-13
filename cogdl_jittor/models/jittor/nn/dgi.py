@@ -3,7 +3,7 @@ import jittor
 from jittor import nn,Module
 from cogdl_jittor.models import BaseModel
 from cogdl_jittor.utils import get_activation, spmm
-from cogdl_jittor.datasets import CoraDataset
+from cogdl_jittor.datasets.planetoid_data import CoraDataset
 
 # Borrowed from https://github.com/PetarV-/DGI
 class GCN(Module):

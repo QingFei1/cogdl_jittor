@@ -3,8 +3,8 @@ import jittor.nn as nn
 from cogdl_jittor.layers import GATLayer
 # from .. import BaseModel
 from cogdl_jittor.models import BaseModel
-from cogdl_jittor.datasets import CoraDataset
-from cogdl_jittor.datasets import NodeDataset, generate_random_graph
+from cogdl_jittor.datasets.planetoid_data import CoraDataset
+from cogdl_jittor.datasets.customized_data import NodeDataset, generate_random_graph
 
 class GAT(BaseModel):
     r"""The GAT model from the `"Graph Attention Networks"

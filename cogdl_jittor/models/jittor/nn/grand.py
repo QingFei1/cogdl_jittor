@@ -2,7 +2,7 @@ import jittor
 from jittor import nn
 from cogdl_jittor.models import BaseModel
 from cogdl_jittor.utils import spmm
-from cogdl_jittor.datasets import CoraDataset,PubMedDataset
+from cogdl_jittor.datasets.planetoid_data import CoraDataset,PubMedDataset
 
 class Grand(BaseModel):
     """

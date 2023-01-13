@@ -3,9 +3,7 @@ import copy
 from contextlib import contextmanager
 import scipy.sparse as sp
 import networkx as nx
-import torch
-import jittor
-import jittor
+from cogdl_jittor import function as BF
 import numpy as np
 from cogdl_jittor.utils import (
     csr2coo,
@@ -15,7 +13,7 @@ from cogdl_jittor.utils import (
     row_normalization,
     get_degrees,
 )
-from cogdl_jittor.utils.jittor import RandomWalker
+from cogdl_jittor.utils import RandomWalker
 from cogdl_jittor.operators.sample import sample_adj_c, subgraph_c
 
 subgraph_c = None  # noqa: F811
@@ -110,7 +108,7 @@ class BaseGraph(object):
         for key, item in self(*keys):
             if isinstance(item, Adjacency):
                 self[key] = func(item)
-            if not isinstance(item, jittor.Var):
+            if not BF.is_tensor(item):
                 continue
             self[key] = func(item)
         return self
@@ -119,18 +117,17 @@ class BaseGraph(object):
         r"""Ensures a contiguous memory layout for all attributes :obj:`*keys`.
         If :obj:`*keys` is not given, all present attributes are ensured to
         have a contiguous memory layout."""
-        # return self.apply(lambda x: x.contiguous(), *keys)
-        return self.apply(lambda x: x.clone(), *keys)
+        return self.apply(lambda x: x.contiguous(), *keys)
 
-    # def to(self, device, *keys):
-    #     r"""Performs tensor dtype and/or device conversion to all attributes
-    #     :obj:`*keys`.
-    #     If :obj:`*keys` is not given, the conversion is applied to all present
-    #     attributes."""
-    #     return self.apply(lambda x: x.to(device), *keys)
+    def to(self, device, *keys):
+        r"""Performs tensor dtype and/or device conversion to all attributes
+        :obj:`*keys`.
+        If :obj:`*keys` is not given, the conversion is applied to all present
+        attributes."""
+        return self.apply(lambda x: BF.to(x,device), *keys)
 
-    # def cuda(self, *keys):
-    #     return self.apply(lambda x: x.cuda(), *keys)
+    def cuda(self, *keys):
+        return self.apply(lambda x: x.cuda(), *keys)
 
 
 class Adjacency(BaseGraph):
@@ -158,7 +155,7 @@ class Adjacency(BaseGraph):
     def get_weight(self, indicator=None):
         """If `indicator` is not None, the normalization will not be implemented"""
         if self.weight is None or self.weight.shape[0] != self.col.shape[0]:
-            self.weight = jittor.ones(self.num_edges)
+            self.weight = BF.ones(self.num_edges, device=self.device)
         weight = self.weight
         if indicator is not None:
             return weight
@@ -166,7 +163,7 @@ class Adjacency(BaseGraph):
         if self.__in_norm__ is not None:
             if self.row is None:
                 num_nodes = self.row_ptr.size(0) - 1
-                row = jittor.arange(num_nodes)
+                row = BF.arange(num_nodes, device=self.device)
                 row_count = self.row_ptr[1:] - self.row_ptr[:-1]
                 self.row = row.repeat_interleave(row_count)
             weight = self.__in_norm__[self.row].view(-1)
@@ -181,7 +178,7 @@ class Adjacency(BaseGraph):
             )
             self.row, self.col = edge_index
             self.attr = weight_attr
-            self.weight = jittor.ones_like(self.row).float()
+            self.weight = BF.ones_like(self.row).float()
         else:
             edge_index, self.weight = add_remaining_self_loops(
                 (self.row, self.col), fill_value=1, num_nodes=self.num_nodes
@@ -193,25 +190,24 @@ class Adjacency(BaseGraph):
         self.col = self.col[reindex]
 
     def padding_self_loops(self):
-        # device = self.row.device
-        row, col = jittor.arange(self.num_nodes), jittor.arange(self.num_nodes
-        )
-        self.row = jittor.concat((self.row, row))
-        self.col = jittor.concat((self.col, col))
+        device = self.row.device
+        row, col = BF.arange(self.num_nodes, device=device), BF.arange(self.num_nodes, device=device)
+        self.row = BF.cat((self.row, row))
+        self.col = BF.cat((self.col, col))
 
         if self.weight is not None:
-            values = jittor.zeros(self.num_nodes) + 0.01
-            self.weight = jittor.concat((self.weight, values))
+            values = BF.zeros(self.num_nodes, device=device) + 0.01
+            self.weight = BF.cat((self.weight, values))
         if self.attr is not None:
-            attr = jittor.zeros(self.num_nodes)
-            self.attr = jittor.concat((self.attr, attr))
+            attr = BF.zeros(self.num_nodes, device=device)
+            self.attr = BF.cat((self.attr, attr))
         self.row_ptr, reindex = coo2csr_index(self.row, self.col, num_nodes=self.num_nodes)
         self.row = self.row[reindex]
         self.col = self.col[reindex]
 
     def remove_self_loops(self):
         mask = self.row == self.col
-        inv_mask = ~mask
+        inv_mask = BF.logical_not(mask)
         self.row = self.row[inv_mask]
         self.col = self.col[inv_mask]
         for item in self.__attr_keys__():
@@ -245,12 +241,12 @@ class Adjacency(BaseGraph):
             return
         degrees = (self.row_ptr[1:] - self.row_ptr[:-1]).float()
         if norm == "sym":
-            edge_norm = jittor.pow(degrees, -0.5)
-            edge_norm[jittor.isinf(edge_norm)] = 0
+            edge_norm = BF.to(BF.pow(degrees, -0.5), self.device)
+            edge_norm[BF.isinf(edge_norm)] = 0
             self.__out_norm__ = self.__in_norm__ = edge_norm.view(-1, 1)
         elif norm == "row":
-            edge_norm = jittor.pow(degrees, -1)
-            edge_norm[jittor.isinf(edge_norm)] = 0
+            edge_norm = BF.to(BF.pow(degrees, -1), self.device)
+            edge_norm[BF.isinf(edge_norm)] = 0
             self.__out_norm__ = None
             self.__in_norm__ = edge_norm.view(-1, 1)
         elif norm == "col":
@@ -264,7 +260,7 @@ class Adjacency(BaseGraph):
         if self.__normed__:
             return
         if self.weight is None or self.weight.shape[0] != self.col.shape[0]:
-            self.weight = jittor.ones(self.num_edges)
+            self.weight = BF.ones(self.num_edges, device=self.device)
 
         if norm == "sym":
             self.weight = symmetric_normalization(self.num_nodes, self.row, self.col, self.weight)
@@ -285,7 +281,7 @@ class Adjacency(BaseGraph):
         self.row = self.row[reindex]
         for key in self.__attr_keys__():
             if key == "weight" and self[key] is None:
-                self.weight = jittor.ones(self.row.shape[0])
+                self.weight = BF.to(BF.ones(self.row.shape[0]), self.row)
             if self[key] is not None:
                 self[key] = self[key][reindex]
 
@@ -331,7 +327,7 @@ class Adjacency(BaseGraph):
         if self.row is not None:
             return self.row.shape[0]
         elif self.row_ptr is not None:
-            return self.row_ptr[-1].item() #jittor.ones() need list
+            return self.row_ptr[-1]
         else:
             return None
 
@@ -349,9 +345,9 @@ class Adjacency(BaseGraph):
     def row_ptr_v(self):
         return self.row_ptr
 
-    # @property
-    # def device(self):
-    #     return self.row.device if self.row is not None else self.row_ptr.device
+    @property
+    def device(self):
+        return BF.device(self.row) if self.row is not None else BF.device(self.row_ptr)
 
     @property
     def keys(self):
@@ -412,15 +408,15 @@ class Adjacency(BaseGraph):
         return Adjacency.from_dict({k: v.clone() for k, v in self})
 
     def to_scipy_csr(self):
-        data = self.get_weight().numpy()
+        data = BF.cpu(self.get_weight()).numpy()
         num_nodes = int(self.num_nodes)
         if self.row_ptr is None:
-            row = self.row.numpy()
-            col = self.col.numpy()
+            row = BF.cpu(self.row).numpy()
+            col = BF.cpu(self.col).numpy()
             mx = sp.csr_matrix((data, (row, col)), shape=(num_nodes, num_nodes))
         else:
-            row_ptr = self.row_ptr.numpy()
-            col_ind = self.col.numpy()
+            row_ptr = BF.cpu(self.row_ptr).numpy()
+            col_ind = BF.cpu(self.col).numpy()
             mx = sp.csr_matrix((data, col_ind, row_ptr), shape=(num_nodes, num_nodes))
         return mx
 
@@ -435,7 +431,7 @@ class Adjacency(BaseGraph):
             weight = self.get_weight().tolist()
             gnx.add_weighted_edges_from([(row[i], col[i], weight[i]) for i in range(len(row))])
         else:
-            edges = jittor.stack((row, col)).numpy().transpose()
+            edges = BF.cpu(BF.stack((row, col))).numpy().transpose()
             gnx.add_edges_from(edges)
         return gnx
 
@@ -478,8 +474,8 @@ class Graph(BaseGraph):
     def __init__(self, x=None, y=None, **kwargs):
         super(Graph, self).__init__()
         if x is not None:
-            if not isinstance (x,jittor.Var):
-                raise ValueError("Node features must be jittor.Var")
+            if not BF.is_tensor(x):
+                raise ValueError("Node features must be Tensor")
         self.x = x
         self.y = y
         self.grb_adj = None
@@ -574,8 +570,8 @@ class Graph(BaseGraph):
     def mask2nid(self, split):
         mask = getattr(self, f"{split}_mask")
         if mask is not None:
-            if mask.dtype is jittor.bool:
-                return jittor.where(mask)[0]
+            if mask.dtype is BF.dtype_dict('bool'):
+                return BF.where(mask)[0]
             return mask
 
     @property
@@ -686,9 +682,9 @@ class Graph(BaseGraph):
         keys = [key for key in keys if key[:2] != "__" and key[-2:] != "__"]
         return keys
 
-    # @property
-    # def device(self):
-    #     return self._adj
+    @property
+    def device(self):
+        return BF.device(self._adj)
 
     def degrees(self):
         return self._adj.degrees()
@@ -733,7 +729,7 @@ class Graph(BaseGraph):
         r"""Returns the number of features per node in the graph."""
         if self.x is None:
             return 0
-        return 1 if len(self.x.shape) == 1 else self.x.size(1)
+        return 1 if BF.dim(self.x) == 1 else self.x.size(1)
 
     @property
     def num_nodes(self):
@@ -747,7 +743,7 @@ class Graph(BaseGraph):
     @property
     def num_classes(self):
         if self.y is not None:
-            return int(jittor.max(self.y) + 1) if len(self.y.shape) == 1 else self.y.shape[-1]
+            return int(BF.max(self.y) + 1) if self.y.dim() == 1 else self.y.shape[-1]
 
     @num_nodes.setter
     def num_nodes(self, num_nodes):
@@ -790,26 +786,14 @@ class Graph(BaseGraph):
 
     def sample_adj(self, batch, size=-1, replace=True):
         if sample_adj_c is not None:
-            if not isinstance(batch,jittor.Var):
-                batch = jittor.array(batch).long()
+            if not BF.is_tensor(batch):
+                batch = BF.tensor(batch, dtype=BF.dtype_dict('long'))
             (row_ptr, col_indices, nodes, edges) = sample_adj_c(
                 self._adj.row_indptr, self.col_indices, batch, size, replace
             )
-            #先转为torch test，之后再改
-            # row_indptr=torch.LongTensor(self._adj.row_indptr.numpy())
-            # col_indices=torch.LongTensor(self.col_indices.numpy())
-            # batch=torch.LongTensor(batch.numpy())
-            # (row_ptr, col_indices, nodes, edges) = sample_adj_c(
-            #     row_indptr, col_indices, batch, size, replace
-            # )
-            # row_ptr=jittor.array(row_ptr.numpy())
-            # col_indices=jittor.array(col_indices.numpy())
-            # nodes=jittor.array(nodes.numpy())
-            # edges=jittor.array(edges.numpy())
-            #先转为torch test，之后再改
         else:
-            if isinstance(batch,jittor.Var):
-                batch = batch.numpy()
+            if BF.is_tensor(batch):
+                batch = BF.cpu(batch).numpy()
             if self.__is_train__ and self._adj_train is not None:
                 key = "__mx_train__"
             else:
@@ -829,47 +813,47 @@ class Graph(BaseGraph):
                 indices = indices.numpy()
             col_nodes = np.unique(indices)
             _node_idx = np.concatenate([batch, np.setdiff1d(col_nodes, batch)])
-            nodes = jittor.array(_node_idx).long()
+            nodes = BF.tensor(_node_idx, dtype=BF.dtype_dict('long'))
 
             assoc_dict = {v: i for i, v in enumerate(_node_idx)}
 
-            col_indices = jittor.array([assoc_dict[i] for i in indices]).long()
-            row_ptr = jittor.array(indptr).long()
+            col_indices = BF.tensor([assoc_dict[i] for i in indices], dtype=BF.dtype_dict('long'))
+            row_ptr = BF.tensor(indptr, dtype=BF.dtype_dict('long'))
 
         if row_ptr.shape[0] - 1 < nodes.shape[0]:
-            padding = jittor.full((nodes.shape[0] - row_ptr.shape[0] + 1,), row_ptr[-1].item(), dtype=row_ptr.dtype)
-            row_ptr = jittor.concat([row_ptr, padding])
+            padding = BF.full((nodes.shape[0] - row_ptr.shape[0] + 1,), row_ptr[-1].item(), dtype=row_ptr.dtype)
+            row_ptr = BF.cat([row_ptr, padding])
         g = Graph(row_ptr=row_ptr, col=col_indices)
         return nodes, g
 
     def _sample_adj(self, batch_size, indices, indptr, size):
-        if not isinstance(indices,jittor.Var):
-            indices = jittor.array(indices)
-        if not isinstance(indptr,jittor.Var):
-            indptr = jittor.array(indptr)
+        if not BF.is_tensor(indices):
+            indices = BF.from_numpy(indices)
+        if not BF.is_tensor(indptr):
+            indptr = BF.from_numpy(indptr)
         assert indptr.shape[0] - 1 == batch_size
         row_counts = (indptr[1:] - indptr[:-1]).long()
-        rand = jittor.rand(batch_size, size)
+        rand = BF.rand(batch_size, size)
         rand = rand * row_counts.view(-1, 1)
         rand = rand.long()
 
         rand = rand + indptr[:-1].view(-1, 1)
         edge_cols = indices[rand].view(-1)
-        row_ptr = jittor.arange(0, batch_size * size + size, size)
+        row_ptr = BF.arange(0, batch_size * size + size, size)
         return row_ptr, edge_cols
 
     def csr_subgraph(self, node_idx, keep_order=False):
         if self._adj.row_ptr_v is None:
             self._adj._to_csr()
-        if isinstance(node_idx,jittor.Var):
-            node_idx = node_idx
+        if BF.is_tensor(node_idx):
+            node_idx = BF.cpu(node_idx)
         else:
-            node_idx = jittor.array(node_idx)
+            node_idx = BF.as_tensor(node_idx)
 
         if not keep_order:
-            node_idx = jittor.unique(node_idx)
+            node_idx = BF.unique(node_idx)
         indptr, indices, nodes, edges = subgraph_c(self._adj.row_ptr, self._adj.col, node_idx)
-        nodes_idx = node_idx.to(self._adj)
+        nodes_idx = BF.to(node_idx, self._adj)
 
         data = Graph(row_ptr=indptr, col=indices)
         for key in self.__keys__():
@@ -887,15 +871,15 @@ class Graph(BaseGraph):
     def subgraph(self, node_idx, keep_order=False):
         if subgraph_c is not None:
             if isinstance(node_idx, list):
-                node_idx = jittor.array(node_idx).long()
+                node_idx = BF.as_tensor(node_idx, dtype=BF.dtype_dict('long'))
             elif isinstance(node_idx, np.ndarray):
-                node_idx = jittor.array(node_idx)
+                node_idx = BF.from_numpy(node_idx)
             return self.csr_subgraph(node_idx, keep_order)
         else:
             if isinstance(node_idx, list):
                 node_idx = np.array(node_idx, dtype=np.int64)
-            elif isinstance(node_idx,jittor.Var):
-                node_idx = node_idx.long().numpy()
+            elif BF.is_tensor(node_idx):
+                node_idx = BF.cpu(node_idx.long()).numpy()
             if self.__is_train__ and self._adj_train is not None:
                 key = "__mx_train__"
             else:
@@ -908,19 +892,19 @@ class Graph(BaseGraph):
                 self[key] = sp.csr_matrix((val, (row, col)), shape=(N, N))
             sub_adj = self[key][node_idx, :][:, node_idx]
             sub_g = Graph()
-            sub_g.row_indptr = jittor.array(sub_adj.indptr).long()
-            sub_g.col_indices = jittor.array(sub_adj.indices).long()
-            sub_g.edge_weight = jittor.array(sub_adj.data)
+            sub_g.row_indptr = BF.from_numpy(sub_adj.indptr).long()
+            sub_g.col_indices = BF.from_numpy(sub_adj.indices).long()
+            sub_g.edge_weight = BF.from_numpy(sub_adj.data)
             for key in self.__keys__():
                 sub_g[key] = self[key][node_idx]
-            return sub_g
+            return BF.to(sub_g, self._adj)
 
     def edge_subgraph(self, edge_idx, require_idx=True):
         row, col = self._adj.edge_index
         row = row[edge_idx]
         col = col[edge_idx]
-        edge_index = jittor.stack([row, col])
-        nodes, new_edge_index = jittor.unique(edge_index, return_inverse=True)
+        edge_index = BF.stack([row, col])
+        nodes, new_edge_index = BF.unique(edge_index, return_inverse=True)
         g = Graph(edge_index=new_edge_index)
         for key in self.__keys__():
             g[key] = self[key][nodes]
@@ -951,7 +935,7 @@ class Graph(BaseGraph):
         return data
 
     def nodes(self):
-        return jittor.arange(self.num_nodes)
+        return BF.arange(self.num_nodes)
 
     def set_grb_adj(self, adj):
         self.grb_adj = adj
@@ -959,12 +943,7 @@ class Graph(BaseGraph):
     # @property
     # def requires_grad(self):
     #     return False
-    
+    #
     # @requires_grad.setter
     # def requires_grad(self, x):
-    #     print(f"Set `requires_grad` to {x}")
-
-
-
-
-
+    #     print(BF"Set `requires_grad` to {x}")

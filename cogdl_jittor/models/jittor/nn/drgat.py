@@ -2,9 +2,9 @@ import numpy as np
 import jittor
 from jittor import nn
 from cogdl_jittor.layers import SELayer, GCNLayer ,GATLayer
-from cogdl_jittor.datasets import CoraDataset,CiteSeerDataset
+from cogdl_jittor.datasets.planetoid_data import CoraDataset,CiteSeerDataset
 from cogdl_jittor.models import BaseModel
-from cogdl_jittor.datasets import NodeDataset, generate_random_graph
+from cogdl_jittor.datasets.customized_data import NodeDataset, generate_random_graph
 
 class DrGAT(BaseModel):
     @staticmethod

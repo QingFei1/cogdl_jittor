@@ -1,11 +1,9 @@
 import os
 import logging
 
-import torch
-import torch.multiprocessing as mp
 
 from typing import List, Optional
-from cogdl.wrappers import ModelWrapper
+from cogdl_jittor.wrappers import ModelWrapper
 
 log = logging.getLogger(__name__)
 

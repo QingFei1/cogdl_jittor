@@ -64,7 +64,7 @@ setup(
         "scikit_learn",
         "tabulate",
         "optuna==2.4.0",
-        "ogb",
+        # "ogb",
         "pre-commit",
         "flake8",
         "numba",

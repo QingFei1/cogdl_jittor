@@ -1,33 +1,8 @@
-
-# from cogdl_jittor.backend import BACKEND
-
-# if BACKEND == 'jittor':
-#     from .jittor import *
-# elif BACKEND == 'torch':
-#     from .torch import *
-# else:
-#     raise ("Unsupported backend:", BACKEND)
-
-
-
-
-from cogdl_jittor.backend import BACKEND
-
-if BACKEND == 'jittor':
-    import jittor
-    from .jittor import *
-elif BACKEND == 'torch':
-    import torch
-    from .torch import *
-else:
-    raise ("Unsupported backend:", BACKEND)
-
-
 import importlib
 import inspect
-
-from cogdl_jittor.data import Dataset
-from cogdl_jittor.datasets import NodeDataset, GraphDataset, generate_random_graph
+from cogdl_jittor import function as BF
+from cogdl_jittor.data.jittor import Dataset
+from .customized_data import NodeDataset, GraphDataset, generate_random_graph
 
 
 def register_dataset(name):
@@ -112,18 +87,14 @@ def build_dataset_from_path(data_path, dataset=None):
 
     if dataset is None:
         try:
-            if BACKEND == 'torch':
-                return torch.load(data_path)
-            elif BACKEND == 'jittor':
-                return jittor.load(data_path)
+            return BF.load(data_path)
         except Exception as e:
             print(e)
             exit(0)
     raise ValueError("You are expected to specify `dataset` and `data_path`")
 
-
 SUPPORTED_DATASETS = {
-    "cora": f"cogdl_jittor.datasets.{BACKEND}.planetoid_data.CoraDataset",
-    "citeseer": f"cogdl_jittor.datasets.{BACKEND}.planetoid_data.CiteSeerDataset",
-    "pubmed": f"cogdl_jittor.datasets.{BACKEND}.planetoid_data.PubMedDataset",
+    "cora": "cogdl_jittor.datasets.planetoid_data.CoraDataset",
+    "citeseer": "cogdl_jittor.datasets.planetoid_data.CiteSeerDataset",
+    "pubmed": "cogdl_jittor.datasets.planetoid_data.PubMedDataset",
 }

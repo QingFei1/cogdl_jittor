@@ -5,7 +5,7 @@ import numpy as np
 
 from cogdl_jittor.data import Dataset, Graph
 from cogdl_jittor.utils import  download_url, untar, coalesce,remove_self_loops
-import jittor
+from cogdl_jittor import function as BF
 def parse_index_file(filename):
     index = []
     for line in open(filename):
@@ -14,7 +14,7 @@ def parse_index_file(filename):
 
 
 def index_to_mask(index, size):
-    mask = jittor.full((size,), False).bool()
+    mask = BF.full((size,), False).bool()
     mask[index] = True
     return mask
 
@@ -38,14 +38,14 @@ def edge_index_from_dict(graph_dict, num_nodes=None):
     order = np.lexsort((_col, _row))
     edge_index = edge_index[:, order]
 
-    edge_index = jittor.array(edge_index).long()
+    edge_index = BF.array(edge_index).long()
     # There may be duplicated edges and self loops in the datasets.
     edge_index, _ = remove_self_loops(edge_index)
-    row = jittor.concat([edge_index[0], edge_index[1]])
-    col = jittor.concat([edge_index[1], edge_index[0]])
+    row = BF.concat([edge_index[0], edge_index[1]])
+    col = BF.concat([edge_index[1], edge_index[0]])
 
     row, col, _ = coalesce(row, col)
-    edge_index = jittor.stack([row, col])
+    edge_index = BF.stack([row, col])
     return edge_index
 
 
@@ -60,9 +60,9 @@ def read_planetoid_data(folder, prefix):
             else:
                 objects.append(pkl.load(f))
     test_index = parse_index_file(f"{folder}/ind.{prefix}.{names[-1]}")
-    test_index = jittor.array(test_index).long()
+    test_index = BF.array(test_index).long()
     # test_index_reorder = test_index.sort()[0]
-    test_index_reorder =jittor.argsort(test_index)[1]
+    test_index_reorder =BF.argsort(test_index)[1]
 
     x, tx, allx, y, ty, ally, graph = tuple(objects)
     # getA() matrix转化numpy

@@ -1,4 +1,3 @@
-import torch
 from cogdl_jittor.data import Dataset
 
 from cogdl_jittor.wrappers.jittor.data_wrapper.base_data_wrapper import OnLoadingWrapper

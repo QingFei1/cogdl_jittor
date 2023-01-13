@@ -3,7 +3,6 @@ import os.path as osp
 from itertools import repeat
 import numpy as np
 
-import torch.utils.data
 import jittor
 from .data import Adjacency, Graph
 from cogdl_jittor.utils import makedirs,Accuracy, CrossEntropyLoss
